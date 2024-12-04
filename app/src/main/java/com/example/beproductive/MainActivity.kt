@@ -10,14 +10,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -26,11 +23,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +34,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.beproductive.ui.theme.BeProductiveTheme
+
 //import androidx.lifecycle.viewmodel.compose.viewModel
 
 class MainActivity : ComponentActivity() {
@@ -62,13 +57,33 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppContent() {
+    val tasks = remember {
+        mutableStateListOf(
+            Pair("Task1", false),
+            Pair("Task2", false),
+            Pair("Task3", false),
+            Pair("Task4", false),
+            Pair("Task5", false),
+            Pair("Task6", false),
+            Pair("Task7", false),
+            Pair("Task8", false),
+            Pair("Task9", false),
+            Pair("Task10", false),
+        )
+    }
+
+    val checkedTasks = tasks.count { it.second }
+    val progress = if (tasks.isNotEmpty()) checkedTasks / tasks.size.toFloat() else 0f
+
+
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
 
-        // Main Content: Header and Scrollable List
+        // Main Content: Header, Progress Bar and Scrollable List
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -96,7 +111,62 @@ fun AppContent() {
                 )
             }
 
-            ScrollableList()
+            //Progress bar
+            Column(
+                modifier = Modifier
+                    //.padding(16.dp)
+                    //.background(Color(0xFFEFB8C8))
+            ) {
+                Text(
+                    text = "Progress: $checkedTasks / ${tasks.size}",
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(10.dp)
+
+                )
+                LinearProgressIndicator(
+                    progress = progress,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                    color = Color(0xFF7D5260)
+                )
+            }
+
+            //Scrollable List
+            LazyColumn(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(tasks.size) { index ->
+                    val task = tasks[index]
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                            .background(
+                                if (task.second) Color(0xFFCCC2DC) else Color(0xFFD0BCFF),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                tasks[index] = task.copy(second = !task.second)
+                            }
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = task.second,
+                            onCheckedChange = {
+                                tasks[index] = task.copy(second = it)
+                            }
+                        )
+                        Text(
+                            text = task.first,
+                            modifier = Modifier.weight(1f),
+                            fontSize = 18.sp
+                        )
+                    }
+                }
+            }
         }
 
 
@@ -104,7 +174,7 @@ fun AppContent() {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(100.dp) // Footer height
+                .height(80.dp) // Footer height
                 .align(Alignment.BottomCenter) // Fix the footer at the bottom
                 .clip(RoundedCornerShape(16.dp)) // Rounded top corners
                 .background(Color(0xFFEFB8C8))
@@ -130,74 +200,6 @@ fun AppContent() {
 
             }
         }
-    }
-}
-
-
-@Composable
-fun ScrollableList() {
-    val listOfTasks = remember {
-        listOf(
-            "Task 1", "Task 2", "Task 3", "Task 4", "Task 5", "Task 6", "Task 7", "Task 8", "Task 9",
-            "Task 10", "Task 11", "Task 12", "Task 13", "Task 14", "Task 15", "Task 16", "Task 17", "Task 18",
-            "Task 19", "Task 20", "Task 21", "Task 22", "Task 23", "Task 24", "Task 25", "Task 26", "Task 27",
-            "Task 28", "Task 29", "Task 30"
-        )
-    }
-
-    //val tasksListViewModel: TasksListViewModel = viewModel()
-    //val listOfTasks = tasksListViewModel.tasks.collectAsState()
-
-    var checkedTasks by remember { mutableStateOf(setOf<String>()) }
-
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        items(listOfTasks) { task ->
-            ListItem(
-                text = task,
-                isSelected = checkedTasks.contains(task),
-                onSelect = {
-                    checkedTasks = if (checkedTasks.contains(task)) {
-                        checkedTasks - task  // Remove from selected
-                    } else {
-                        checkedTasks + task  // Add to selected
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-fun ListItem(
-    text: String,
-    isSelected: Boolean,
-    onSelect: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .height(60.dp)
-            .background(
-                if (isSelected) Color(0xFFCCC2DC) // Grey background for selected tasks
-                else Color(0xFFD0BCFF)    // Purple background for unselected tasks
-            )
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Checkbox(
-            checked = isSelected,
-            onCheckedChange = { onSelect() }
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(8.dp)
-        )
     }
 }
 
