@@ -87,7 +87,7 @@ fun AppContent() {
     }
 
     val checkedTasks = tasks.count { it.isSelected }
-    val progress = if (tasks.isNotEmpty()) checkedTasks / tasks.size.toFloat() else 0f
+    //val progress = if (tasks.isNotEmpty()) checkedTasks / tasks.size.toFloat() else 0f
 
     var newTaskName by remember { mutableStateOf(TextFieldValue("")) }
 
@@ -124,42 +124,45 @@ fun AppContent() {
                 )
             }
 
+            //Footer with 'New Task' box
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp) // Footer height
+                    //.align(Alignment.BottomCenter) // Fix the footer at the bottom
+                    .clip(RoundedCornerShape(16.dp)) // Rounded top corners
+                    .background(Color(0xFFEFB8C8))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFEFB8C8))
+                        .clip(RoundedCornerShape(16.dp))
+                        .padding(horizontal = 16.dp), // Add padding to the sides
+                    horizontalArrangement = Arrangement.SpaceEvenly, // Evenly space buttons
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FooterAddTask(
+                        newTaskName = newTaskName,
+                        onNewTaskNameChange = { newTaskName = it },
+                        onAddTask = {
+                            if (newTaskName.text.isNotBlank()) {
+                                tasks.add(Task(newTaskName.text))
+                                newTaskName = TextFieldValue("")
+                            }
+                        },
+                        onDeleteCompleted = {
+                            tasks.removeAll { it.isSelected }
+                        }
+                    )
+                }
+            }
+
             //Progress Bar
             ProgressBar(checkedNumber = checkedTasks, totalNumber = tasks.size)
 
             //Scrollable List of Tasks
             ScrollableList(tasks = tasks)
-        }
-
-        //Footer with 'New' Task' box
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(80.dp) // Footer height
-                .align(Alignment.BottomCenter) // Fix the footer at the bottom
-                .clip(RoundedCornerShape(16.dp)) // Rounded top corners
-                .background(Color(0xFFEFB8C8))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFFEFB8C8))
-                    .clip(RoundedCornerShape(16.dp))
-                    .padding(horizontal = 16.dp), // Add padding to the sides
-                horizontalArrangement = Arrangement.SpaceEvenly, // Evenly space buttons
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FooterAddTask(
-                    newTaskName = newTaskName,
-                    onNewTaskNameChange = { newTaskName = it },
-                    onAddTask = {
-                        if (newTaskName.text.isNotBlank()) {
-                            tasks.add(Task(newTaskName.text))
-                            newTaskName = TextFieldValue("")
-                        }
-                    }
-                )
-            }
         }
     }
 }
@@ -240,30 +243,60 @@ fun ListItem(task: Task, onCheckedChange: (Boolean) -> Unit) {
 fun FooterAddTask(
     newTaskName: TextFieldValue,
     onNewTaskNameChange: (TextFieldValue) -> Unit,
-    onAddTask: () -> Unit
+    onAddTask: () -> Unit,
+    onDeleteCompleted: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
     ) {
-        TextField(
-            value = newTaskName,
-            onValueChange = onNewTaskNameChange,
-            label = { Text("New Task") },
+        Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Button(
-            onClick = onAddTask,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
                 .fillMaxWidth()
-                .align(Alignment.CenterVertically)
+                .padding(top = 8.dp)
+                .clip(RoundedCornerShape(16.dp))
         ) {
-            Text(text = "Add")
+            TextField(
+                value = newTaskName,
+                onValueChange = onNewTaskNameChange,
+                label = { Text("New Task") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+
+            )
         }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .clip(RoundedCornerShape(16.dp))
+        ) {
+
+            //Add new task button
+            Button(
+                onClick = onAddTask,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .width(180.dp)
+            ) {
+                Text(text = "Add")
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            //Delete completed button
+            Button(
+                onClick = onDeleteCompleted,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .width(200.dp)
+            ) {
+                Text(text = "Delete Completed")
+            }
+        }
+
     }
 }
