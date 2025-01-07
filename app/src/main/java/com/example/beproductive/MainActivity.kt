@@ -1,6 +1,9 @@
 package com.example.beproductive
 
+import android.content.Context
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -10,7 +13,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,50 +34,56 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.room.ColumnInfo
-import androidx.room.Dao
-import androidx.room.Database
-import androidx.room.Delete
-import androidx.room.Entity
-import androidx.room.Index
-import androidx.room.Insert
-import androidx.room.PrimaryKey
-import androidx.room.Query
-import androidx.room.Room
-import androidx.room.RoomDatabase
-import androidx.room.Update
 import com.example.beproductive.ui.theme.BeProductiveTheme
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.ktx.database
+import com.google.firebase.ktx.Firebase
 import kotlinx.serialization.Serializable
-import android.content.Context
-import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.ui.platform.LocalContext
-import com.google.android.gms.tasks.Tasks
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.OutputStreamWriter
-import org.xmlpull.v1.XmlPullParser
-import org.xmlpull.v1.XmlPullParserFactory
 
 
 //import androidx.lifecycle.viewmodel.compose.viewModel
+/*
+abstract class ReadandWriteSnipets {
+    private lateinit var database: DatabaseReference
 
+    fun initializeDbRef() {
+        // [START initialize_database_ref]
+        database = Firebase.database.reference
+        // [END initialize_database_ref]
+    }
 
+    fun writeNewTask(taskID: String, name: String, isSelected: Boolean) {
+        val task = Task(name, isSelected)
+
+        database.child("tasks").child(taskID).setValue(task)
+    }
+}
+ */
 
 @Serializable
 data class Task(
-    val name: String,
+    //var id: String = "",
+    var name: String = "",
     var isSelected: Boolean = false
 )
 
@@ -119,29 +127,6 @@ abstract class AppDatabase : RoomDatabase() {
 }
 */
 
-//Functions to handle tasks with JSON
-/*
-object TaskStorage {
-    private const val FILE_NAME = "tasks.json"
-
-    // Save tasks to a file
-    fun saveTasks(context: Context, tasks: List<Task>) {
-        val json = Json.encodeToString(tasks)
-        val file = File(context.filesDir, FILE_NAME)
-        file.writeText(json)
-    }
-
-    // Load tasks from a file
-    fun loadTasks(context: Context): List<Task> {
-        val file = File(context.filesDir, FILE_NAME)
-        if (!file.exists()) {
-            return emptyList()
-        }
-        val json = file.readText()
-        return Json.decodeFromString(json)
-    }
-}
- */
 
 //Functions to handle XML
 object TaskStorage {
@@ -205,12 +190,94 @@ object TaskStorage {
     }
 }
 
+object FirebaseTaskHelper {
+    private val database = Firebase.database("https://beproductive-f7dd2-default-rtdb.europe-west1.firebasedatabase.app/")
+    //private val database = FirebaseDatabase.getInstance("https://beproductive-f7dd2-default-rtdb.europe-west1.firebasedatabase.app/")
+    private val tasksRef = database.getReference("tasks")
+
+    //Adds a task to firebase based on name and checked status(false)
+    fun addTask(task: Task) {
+        val newTaskRef = tasksRef.push()
+        newTaskRef.setValue(task)
+            .addOnSuccessListener {
+                Log.d("Firebase", "Task added successfully")
+            }
+            .addOnFailureListener { e ->
+                Log.e("Firebase", "Error adding task", e)
+            }
+    }
+
+    //Gets the Firebase ID of a task based on it's name
+    fun getTaskIdByName(taskName: String, onTaskIdFound: (String?) -> Unit) {
+        val tasksRef = FirebaseDatabase.getInstance().getReference("tasks")
+
+        tasksRef.orderByChild("name").equalTo(taskName).addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    // Get the first matching task ID
+                    val taskId = snapshot.children.firstOrNull()?.key
+                    onTaskIdFound(taskId) // Pass the task ID to the callback
+                } else {
+                    onTaskIdFound(null) // No matching task found
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("Firebase", "Error querying task by name", error.toException())
+                onTaskIdFound(null)
+            }
+        })
+    }
+
+
+    //Deletes a task from Firebase based on it's ID that will be found by it's name
+    fun deleteTaskByName(taskName: String) {
+        getTaskIdByName(taskName) { taskId ->
+            if (taskId != null) {
+                val tasksRef = FirebaseDatabase.getInstance().getReference("tasks")
+                tasksRef.child(taskId).removeValue()
+                    .addOnSuccessListener {
+                        Log.d("Firebase", "Task '$taskName' deleted successfully")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("Firebase", "Error deleting task '$taskName'", e)
+                    }
+            } else {
+                Log.d("Firebase", "Task '$taskName' not found")
+            }
+        }
+    }
+
+
+    fun updateTaskStatusByName(taskName: String, newStatus: Boolean) {
+        getTaskIdByName(taskName) { taskId ->
+            if (taskId != null) {
+                val tasksRef = FirebaseDatabase.getInstance().getReference("tasks")
+                tasksRef.child(taskId).child("isSelected").setValue(newStatus)
+                    .addOnSuccessListener {
+                        Log.d("Firebase", "Task '$taskName' status updated successfully")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("Firebase", "Error updating task '$taskName'", e)
+                    }
+            } else {
+                Log.d("Firebase", "Task '$taskName' not found")
+            }
+        }
+    }
+}
+
+
 class MainActivity : ComponentActivity() {
     private val tasks = mutableStateListOf<Task>()
+
+    //private val database = FirebaseDatabase.getInstance("https://beproductive-f7dd2-default-rtdb.europe-west1.firebasedatabase.app/")
+    //private val tasksRef = database.getReference("tasks")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        //Loads all the tasks from the XML file
         tasks.addAll(TaskStorage.loadTasks(this))
         enableEdgeToEdge()
         setContent {
@@ -237,9 +304,13 @@ class MainActivity : ComponentActivity() {
 }
 
 
+
+
 @Composable
 fun AppContent(tasks: SnapshotStateList<Task>,
                onSaveTasks: () -> Unit) {
+
+
     val context = LocalContext.current
     /*val tasks = remember {
         mutableStateListOf<Task>().apply {
@@ -325,7 +396,7 @@ fun AppContent(tasks: SnapshotStateList<Task>,
                 )
             }
 
-            //Footer with 'New Task' box
+            //Footer with 'New Task' box and buttons
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -348,33 +419,66 @@ fun AppContent(tasks: SnapshotStateList<Task>,
                         onNewTaskNameChange = { newTaskName = it },
                         onAddTask = {
                             //aici vine si adaugarea in room
+                            /*////////////////////////////////////
                             /////////////////////////////////////
                             /////////////////////////////////////
                             /////////////////////////////////////
                             /////////////////////////////////////
                             /////////////////////////////////////
-                            /////////////////////////////////////
-                            if (newTaskName.text.isNotBlank()) {
+                             */
+                            /*if (newTaskName.text.isNotBlank()) {
                                 tasks.add(Task(newTaskName.text))
                                 newTaskName = TextFieldValue("")
 
-                                //Add to JSON file
+                                //Add to XML file
                                 TaskStorage.saveTasks(context, tasks) // Save tasks
+
+                                //Add to firebase
+                                //writeNewTask();
+                            }*/
+
+                            if (newTaskName.text.isNotBlank()) {
+                                val newTask = Task(name = newTaskName.text)
+
+                                // Add to local list
+                                tasks.add(Task(newTaskName.text))
+
+                                // Add to Firebase
+                                FirebaseTaskHelper.addTask(newTask)
+
+                                // Clear input
+                                newTaskName = TextFieldValue("")
+
+                                //Add to XML file
+                                TaskStorage.saveTasks(context, tasks) // Save tasks
+                            } else {
+                                Toast.makeText(context, "Task name cannot be empty", Toast.LENGTH_SHORT).show()
                             }
                         },
                         onDeleteCompleted = {
                             //aici vine si stergerea din room
+                            /*////////////////////////////////////
                             /////////////////////////////////////
                             /////////////////////////////////////
                             /////////////////////////////////////
                             /////////////////////////////////////
                             /////////////////////////////////////
                             /////////////////////////////////////
-                            /////////////////////////////////////
+                             */
+
+                            //Deletes tasks form firebase by id, which is found based on the name of the task
+                            tasks.filter { it.isSelected }.forEach{ task ->  
+                                FirebaseTaskHelper.deleteTaskByName(task.name)
+                            }
+
+                            //Deletes task from local list
                             tasks.removeAll { it.isSelected }
 
-                            //Add to JSON file
+                            onSaveTasks()
+
+                            //Updates XML file
                             TaskStorage.saveTasks(context, tasks) // Save tasks
+
                         }
                     )
                 }
